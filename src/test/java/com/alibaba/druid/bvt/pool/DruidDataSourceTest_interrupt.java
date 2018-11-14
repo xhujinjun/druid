@@ -15,6 +15,7 @@ public class DruidDataSourceTest_interrupt extends TestCase {
     protected void setUp() throws Exception {
         dataSource = new DruidDataSource() {
 
+            @Override
             protected void createAndStartCreatorThread() {
                 return;
             }

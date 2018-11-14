@@ -28,6 +28,9 @@ import com.alibaba.druid.support.logging.Log;
 import com.alibaba.druid.support.logging.LogFactory;
 
 /**
+ * 定时输出统计信息到日志中(每次输出日志会导致清零（reset）连接池相关的计数器。)
+ *
+ * 开启方式：<property name="timeBetweenLogStatsMillis" value="300000" />
  * @author wenshao<szujobs@hotmail.com>
  * @since 0.2.19
  */
@@ -77,6 +80,25 @@ public class DruidDataSourceStatLoggerImpl extends DruidDataSourceStatLoggerAdap
         logger.info(value);
     }
 
+    /**
+     * {
+     *   "url": "jdbc:mysql://zbrd.trade-master.cnhz.shishike.com:3306/exp_calm_trade_ci1?useUnicode=true&characterEncoding=utf-8",
+     *   "dbType": "mysql",
+     *   "name": "DataSource-13989603",
+     *   "activeCount": 0,
+     *   "activePeak": 1,
+     *   "activePeakTime": "2018-11-14 23:24:17",
+     *   "poolingCount": 1,
+     *   "poolingPeak": 1,
+     *   "poolingPeakTime": "2018-11-14 23:24:18",
+     *   "connectCount": 1,
+     *   "closeCount": 1,
+     *   "connectionHoldTimeHistogram": [
+     *     1
+     *   ]
+     * }
+     * @param statValue
+     */
     @Override
     public void log(DruidDataSourceStatValue statValue) {
         if (!isLogEnable()) {

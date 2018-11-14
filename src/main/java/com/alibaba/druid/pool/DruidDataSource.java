@@ -152,6 +152,9 @@ public class DruidDataSource extends DruidAbstractDataSource
     private boolean                          resetStatEnable         = true;
     private final AtomicLong                 resetCount              = new AtomicLong();
 
+    /**
+     * 初始化堆栈信息
+     */
     private String                           initStackTrace;
 
     private volatile boolean                 closed                  = false;
@@ -415,6 +418,9 @@ public class DruidDataSource extends DruidAbstractDataSource
         }
     }
 
+    /**
+     * 动态修改maxActive
+     */
     public void setMaxActive(int maxActive) {
         if (this.maxActive == maxActive) {
             return;
@@ -424,11 +430,12 @@ public class DruidDataSource extends DruidAbstractDataSource
             throw new IllegalArgumentException("maxActive can't not set zero");
         }
 
+        //如果还没有初始化，直接修改maxActive的值后直接返回
         if (!inited) {
             this.maxActive = maxActive;
             return;
         }
-
+        //新修改的maxActive不能小于minIdle，并且必须要大于0.
         if (maxActive < this.minIdle) {
             throw new IllegalArgumentException("maxActive less than minIdle, " + maxActive + " < " + this.minIdle);
         }
@@ -440,10 +447,12 @@ public class DruidDataSource extends DruidAbstractDataSource
         lock.lock();
         try {
             int allCount = this.poolingCount + this.activeCount;
-
+            //当新设置的值大于原来的值，DruidDataSource的存储数组扩容。
             if (maxActive > allCount) {
                 this.connections = Arrays.copyOf(this.connections, maxActive);
-            } else {
+            }
+            //当新设置的值小于原来的值，DruidDataSource的存储数组根据poolingCount + activeCount的决定是否缩小容量。
+            else {
                 this.connections = Arrays.copyOf(this.connections, allCount);
             }
 
@@ -545,12 +554,12 @@ public class DruidDataSource extends DruidAbstractDataSource
             if (this.dbType == null || this.dbType.length() == 0) {
                 this.dbType = JdbcUtils.getDbType(jdbcUrl, null);
             }
-
+            //初始化拦截器
             for (Filter filter : filters) {
                 filter.init(this);
             }
 
-            if (JdbcConstants.MYSQL.equals(this.dbType) || //
+            if (JdbcConstants.MYSQL.equals(this.dbType) ||
                 JdbcConstants.MARIADB.equals(this.dbType)) {
                 boolean cacheServerConfigurationSet = false;
                 if (this.connectProperties.containsKey("cacheServerConfiguration")) {
@@ -586,6 +595,7 @@ public class DruidDataSource extends DruidAbstractDataSource
 
             initFromSPIServiceLoader();
 
+            //获取驱动类
             if (this.driver == null) {
                 if (this.driverClass == null || this.driverClass.isEmpty()) {
                     this.driverClass = JdbcUtils.getDriverClassName(this.jdbcUrl);
@@ -603,11 +613,13 @@ public class DruidDataSource extends DruidAbstractDataSource
             }
 
             initCheck();
-
+            //初始化异常分选器
             initExceptionSorter();
+            //初始化连接有效性监测器
             initValidConnectionChecker();
             validationQueryCheck();
 
+            // 数据源统计
             if (isUseGlobalDataSourceStat()) {
                 dataSourceStat = JdbcDataSourceStat.getGlobal();
                 if (dataSourceStat == null) {
@@ -622,10 +634,10 @@ public class DruidDataSource extends DruidAbstractDataSource
             }
             dataSourceStat.setResetStatEnable(this.resetStatEnable);
 
+
+            //创建物理连接(数量为initialSize)
             connections = new DruidConnectionHolder[maxActive];
-
             SQLException connectError = null;
-
             try {
                 // init connections
                 for (int i = 0, size = getInitialSize(); i < size; ++i) {
@@ -644,13 +656,17 @@ public class DruidDataSource extends DruidAbstractDataSource
                 connectError = ex;
             }
 
+            //线程模式之日志打印线程(Druid-ConnectionPool-Log-): 一个数据源一个线程
             createAndLogThread();
+            //创建连接线程（Druid-ConnectionPool-Create-）: 一个数据源一个线程
             createAndStartCreatorThread();
+            //（Druid-ConnectionPool-Destroy-）
             createAndStartDestroyThread();
 
             initedLatch.await();
 
             initedTime = new Date();
+            //注册Mbean
             registerMbean();
 
             if (connectError != null && poolingCount == 0) {
@@ -686,6 +702,7 @@ public class DruidDataSource extends DruidAbstractDataSource
     protected void createAndStartDestroyThread() {
         destoryTask = new DestroyTask();
 
+        //如果配置了destroyScheduler 就使用destroyScheduler
         if (destroyScheduler != null) {
             long period = timeBetweenEvictionRunsMillis;
             if (period <= 0) {
@@ -697,6 +714,7 @@ public class DruidDataSource extends DruidAbstractDataSource
             return;
         }
 
+        //如果没有配置destroyScheduler就使用Destroy线程
         String threadName = "Druid-ConnectionPool-Destroy-" + System.identityHashCode(this);
         destroyConnectionThread = new DestroyConnectionThread(threadName);
         destroyConnectionThread.start();
@@ -931,6 +949,7 @@ public class DruidDataSource extends DruidAbstractDataSource
     }
 
     public DruidPooledConnection getConnection(long maxWaitMillis) throws SQLException {
+        //懒初始化
         init();
 
         if (filters.size() > 0) {
@@ -969,18 +988,22 @@ public class DruidDataSource extends DruidAbstractDataSource
                 throw ex;
             }
 
+            //如果配置了 申请连接时执行validationQuery检测连接是否有效
             if (isTestOnBorrow()) {
+                //根据validation sql来校验
                 boolean validate = testConnectionInternal(poolableConnection.getConnection());
-                if (!validate) {
+                if (!validate) {//如果校验没通过就直接抛弃连接
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("skip not validate connection.");
                     }
 
                     Connection realConnection = poolableConnection.getConnection();
+                    //抛弃连接
                     discardConnection(realConnection);
                     continue;
                 }
-            } else {
+            }
+            else {
                 Connection realConnection = poolableConnection.getConnection();
                 if (realConnection.isClosed()) {
                     discardConnection(null); // 传入null，避免重复关闭
@@ -1146,6 +1169,9 @@ public class DruidDataSource extends DruidAbstractDataSource
         return poolalbeConnection;
     }
 
+    /**
+     * 处理连接异常
+     */
     public void handleConnectionException(DruidPooledConnection pooledConnection, Throwable t) throws SQLException {
         final DruidConnectionHolder holder = pooledConnection.getConnectionHolder();
 
@@ -1162,7 +1188,7 @@ public class DruidDataSource extends DruidAbstractDataSource
                 eventListener.connectionErrorOccurred(event);
             }
 
-            // exceptionSorter.isExceptionFatal
+            // 如果是致命异常就移除连接
             if (exceptionSorter != null && exceptionSorter.isExceptionFatal(sqlEx)) {
                 if (pooledConnection.isTraceEnable()) {
                     synchronized (activeConnections) {
@@ -1932,12 +1958,16 @@ public class DruidDataSource extends DruidAbstractDataSource
 
     }
 
+    /**
+     * 丢弃连接的任务
+     */
     public class DestroyTask implements Runnable {
 
         @Override
         public void run() {
             shrink(true);
 
+            //如果配置了removeAbandoned,就关闭连接
             if (isRemoveAbandoned()) {
                 removeAbandoned();
             }
@@ -1986,6 +2016,7 @@ public class DruidDataSource extends DruidAbstractDataSource
                     continue;
                 }
 
+                //如果连接不是running,且连接时间超过removeAbandonedTimeoutMillis
                 long timeMillis = (currrentNanos - pooledConnection.getConnectedTimeNano()) / (1000 * 1000);
 
                 if (timeMillis >= removeAbandonedTimeoutMillis) {

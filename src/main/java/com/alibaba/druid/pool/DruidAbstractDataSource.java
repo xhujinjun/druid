@@ -103,11 +103,27 @@ public abstract class DruidAbstractDataSource extends WrapperAdapter implements 
     protected volatile Integer                         defaultTransactionIsolation;
     protected volatile String                          defaultCatalog                            = null;
 
+    /**
+     * 数据源名称(默认为"DataSource-" + System.identityHashCode(this))
+     *
+     * 用于监控
+     */
     protected String                                   name;
-
+    /**
+     * 用户名
+     */
     protected volatile String                          username;
+    /**
+     * 密码
+     */
     protected volatile String                          password;
+    /**
+     * 连接数据库的url
+     */
     protected volatile String                          jdbcUrl;
+    /**
+     * 驱动类(可选)：如果不配置druid会根据url自动识别dbType，然后选择相应的driverClassName
+     */
     protected volatile String                          driverClass;
     protected volatile ClassLoader                     driverClassLoader;
     protected volatile Properties                      connectProperties                         = new Properties();
@@ -115,22 +131,62 @@ public abstract class DruidAbstractDataSource extends WrapperAdapter implements 
     protected volatile PasswordCallback                passwordCallback;
     protected volatile NameCallback                    userCallback;
 
+    /**
+     * 初始化时建立物理连接的个数
+     */
     protected volatile int                             initialSize                               = DEFAULT_INITIAL_SIZE;
+    /**
+     * 最大连接池数量
+     */
     protected volatile int                             maxActive                                 = DEFAULT_MAX_ACTIVE_SIZE;
+    /**
+     * 最小连接池数量
+     */
     protected volatile int                             minIdle                                   = DEFAULT_MIN_IDLE;
+    /**
+     * 已经不再使用，配置了也没效果
+     */
     protected volatile int                             maxIdle                                   = DEFAULT_MAX_IDLE;
+    /**
+     * 获取连接时最大等待时间，单位毫秒
+     */
     protected volatile long                            maxWait                                   = DEFAULT_MAX_WAIT;
     protected int                                      notFullTimeoutRetryCount                  = 0;
 
+
+    /**
+     * 用来检测连接是否有效的sql，
+     * 要求是一个查询语句，常用select 'x'。
+     * 如果validationQuery为null，testOnBorrow、testOnReturn、testWhileIdle都不会起作用。
+     */
     protected volatile String                          validationQuery                           = DEFAULT_VALIDATION_QUERY;
+    /**
+     * 单位：秒，检测连接是否有效的超时时间
+     */
     protected volatile int                             validationQueryTimeout                    = -1;
+    /**
+     * 申请连接时执行validationQuery检测连接是否有效，做了这个配置会降低性能。
+     */
     private volatile boolean                           testOnBorrow                              = DEFAULT_TEST_ON_BORROW;
+    /**
+     * 归还连接时执行validationQuery检测连接是否有效，做了这个配置会降低性能。
+     */
     private volatile boolean                           testOnReturn                              = DEFAULT_TEST_ON_RETURN;
+    /**
+     * 建议配置为true，不影响性能，并且保证安全性。
+     * 申请连接的时候检测，如果空闲时间大于timeBetweenEvictionRunsMillis，执行validationQuery检测连接是否有效。
+     */
     private volatile boolean                           testWhileIdle                             = DEFAULT_WHILE_IDLE;
+    /**
+     * 是否缓存preparedStatement，也就是PSCache。PSCache对支持游标的数据库性能提升巨大，比如说oracle。在mysql下建议关闭。
+     */
     protected volatile boolean                         poolPreparedStatements                    = false;
     protected volatile boolean                         sharePreparedStatements                   = false;
     protected volatile int                             maxPoolPreparedStatementPerConnectionSize = 10;
 
+    /**
+     * 是否已经初始化了
+     */
     protected volatile boolean                         inited                                    = false;
 
     protected PrintWriter                              logWriter                                 = new PrintWriter(
@@ -138,6 +194,9 @@ public abstract class DruidAbstractDataSource extends WrapperAdapter implements 
 
     protected List<Filter>                             filters                                   = new CopyOnWriteArrayList<Filter>();
     private boolean                                    clearFiltersEnable                        = true;
+    /**
+     * 异常分选机
+     */
     protected volatile ExceptionSorter                 exceptionSorter                           = null;
 
     protected Driver                                   driver;
@@ -153,16 +212,25 @@ public abstract class DruidAbstractDataSource extends WrapperAdapter implements 
 
     protected volatile boolean                         accessToUnderlyingConnectionAllowed       = true;
 
+    /**
+     * 有两个含义：
+     * 1) Destroy线程会检测连接的间隔时间，如果连接空闲时间大于等于minEvictableIdleTimeMillis则关闭物理连接。
+     * 2) testWhileIdle的判断依据，详细看testWhileIdle属性的说明
+     */
     protected volatile long                            timeBetweenEvictionRunsMillis             = DEFAULT_TIME_BETWEEN_EVICTION_RUNS_MILLIS;
 
     protected volatile int                             numTestsPerEvictionRun                    = DEFAULT_NUM_TESTS_PER_EVICTION_RUN;
 
+    /**
+     * 连接保持空闲而不被驱逐的最小时间
+     */
     protected volatile long                            minEvictableIdleTimeMillis                = DEFAULT_MIN_EVICTABLE_IDLE_TIME_MILLIS;
 
+    //连接池泄漏监控
+    //当程序存在缺陷时，申请的连接忘记关闭，这时候，就存在连接泄漏了。Druid提供了RemoveAbandanded相关配置，用来关闭长时间不使用的连接。
+    //注意：配置removeAbandoned对性能会有一些影响，建议怀疑存在泄漏之后再打开。
     protected volatile boolean                         removeAbandoned;
-
     protected volatile long                            removeAbandonedTimeoutMillis              = 300 * 1000;
-
     protected volatile boolean                         logAbandoned;
 
     protected volatile int                             maxOpenPreparedStatements                 = -1;
@@ -173,6 +241,9 @@ public abstract class DruidAbstractDataSource extends WrapperAdapter implements 
 
     protected volatile long                            timeBetweenConnectErrorMillis             = DEFAULT_TIME_BETWEEN_CONNECT_ERROR_MILLIS;
 
+    /**
+     * 连接有效性监测器（ping）
+     */
     protected volatile ValidConnectionChecker          validConnectionChecker                    = null;
 
     protected final AtomicLong                         errorCount                                = new AtomicLong();
@@ -180,7 +251,9 @@ public abstract class DruidAbstractDataSource extends WrapperAdapter implements 
 
     protected final Map<DruidPooledConnection, Object> activeConnections                         = new IdentityHashMap<DruidPooledConnection, Object>();
     protected final static Object                      PRESENT                                   = new Object();
-
+    /**
+     * 数据源ID
+     */
     protected long                                     id;
 
     protected final Date                               createdTime                               = new Date();
@@ -241,9 +314,18 @@ public abstract class DruidAbstractDataSource extends WrapperAdapter implements 
     
     private boolean                                    asyncCloseConnectionEnable                = false;
     protected int                                      maxCreateTaskCount                        = 2;
+
+    //https://github.com/alibaba/druid/wiki/large_amount_datasource_cn
+    //DruidDataSource会使用两个线程分别用于创建连接和销毁连接。在分库分表的某些场景，可能需要数百甚至数千个数据源，因此会创建大量的线程
+    //使用方式：
+    //销毁/检测连接调度器： ds0.setCreateScheduler(createScheduler);
     protected ScheduledExecutorService                 destroyScheduler;
+    //创建连接调度器
     protected ScheduledExecutorService                 createScheduler;
 
+    /**
+     * https://github.com/alibaba/druid/wiki/Druid%E9%94%81%E7%9A%84%E5%85%AC%E5%B9%B3%E6%A8%A1%E5%BC%8F%E9%97%AE%E9%A2%98
+     */
     public DruidAbstractDataSource(boolean lockFair){
         lock = new ReentrantLock(lockFair);
 
@@ -1435,7 +1517,7 @@ public abstract class DruidAbstractDataSource extends WrapperAdapter implements 
             }
 
             initPhysicalConnection(conn);
-
+            //校验连接的有效性
             validateConnection(conn);
             createError = null;
         } catch (SQLException ex) {
