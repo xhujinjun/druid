@@ -1,5 +1,5 @@
 /*
- * Copyright 1999-2011 Alibaba Group Holding Ltd.
+ * Copyright 1999-2018 Alibaba Group Holding Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,12 +41,10 @@ import com.alibaba.druid.util.Utils;
 /**
  * 监控相关的对外数据暴露
  * 
- * <pre>
- * 1. 为了支持jndi数据源本类内部调用druid相关对象均需要反射调用,返回值也应该是Object,List<Object>,Map<String,Object>等无关于druid的类型
+ * 1. 为了支持jndi数据源本类内部调用druid相关对象均需要反射调用,返回值也应该是Object,List&lt;Object&gt;,Map&lt;String,Object&gt;等无关于druid的类型
  * 2. 对外暴露的public方法都应该先调用init()，应该有更好的方式，暂时没想到
- * </pre>
  * 
- * @author sandzhang<sandzhangtoo@gmail.com>
+ * @author sandzhang[sandzhangtoo@gmail.com]
  */
 public final class DruidStatManagerFacade {
 
@@ -96,6 +94,13 @@ public final class DruidStatManagerFacade {
         resetCount.incrementAndGet();
     }
 
+    public void logAndResetDataSource() {
+        if (!isResetEnable()) {
+            return;
+        }
+        DruidDataSourceStatManager.getInstance().logAndResetDataSource();
+    }
+
     public boolean isResetEnable() {
         return resetEnable;
     }
@@ -140,9 +145,21 @@ public final class DruidStatManagerFacade {
         Set<Object> dataSources = getDruidDataSourceInstances();
 
         if (dataSourceId == null) {
+            JdbcDataSourceStat globalStat = JdbcDataSourceStat.getGlobal();
+
             List<Map<String, Object>> sqlList = new ArrayList<Map<String, Object>>();
 
+            DruidDataSource globalStatDataSource = null;
             for (Object datasource : dataSources) {
+                if (datasource instanceof DruidDataSource) {
+                    if (((DruidDataSource) datasource).getDataSourceStat() == globalStat) {
+                        if (globalStatDataSource == null) {
+                            globalStatDataSource = (DruidDataSource) datasource;
+                        } else {
+                            continue;
+                        }
+                    }
+                }
                 sqlList.addAll(getSqlStatDataList(datasource));
             }
 
@@ -245,6 +262,22 @@ public final class DruidStatManagerFacade {
                 } else if (valueA instanceof List && valueB instanceof List) {
                     List<Map<String, Object>> mergedList = mergeNamedList((List) valueA, (List) valueB);
                     newMap.put(key, mergedList);
+                } else if (valueA instanceof long[] && valueB instanceof long[]) {
+                    long[] arrayA = (long[]) valueA;
+                    long[] arrayB = (long[]) valueB;
+
+                    int len = arrayA.length >= arrayB.length ? arrayA.length : arrayB.length;
+                    long[] sum = new long[len];
+
+                    for (int i = 0; i < sum.length; ++i) {
+                        if (i < arrayA.length) {
+                            sum[i] += arrayA.length;
+                        }
+                        if (i < arrayB.length) {
+                            sum[i] += arrayB.length;
+                        }
+                    }
+                    newMap.put(key, sum);
                 } else if (valueA instanceof String && valueB instanceof String) {
                     newMap.put(key, valueA);
                 } else {

@@ -1,5 +1,5 @@
 /*
- * Copyright 1999-2011 Alibaba Group Holding Ltd.
+ * Copyright 1999-2018 Alibaba Group Holding Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,20 +20,56 @@ import java.util.List;
 
 import com.alibaba.druid.sql.SQLUtils;
 import com.alibaba.druid.sql.ast.SQLCommentHint;
+import com.alibaba.druid.sql.ast.SQLExpr;
+import com.alibaba.druid.sql.ast.SQLLimit;
+import com.alibaba.druid.sql.ast.expr.SQLBinaryOperator;
+import com.alibaba.druid.sql.ast.expr.SQLIdentifierExpr;
+import com.alibaba.druid.sql.ast.expr.SQLIntegerExpr;
+import com.alibaba.druid.sql.ast.statement.SQLExprTableSource;
 import com.alibaba.druid.sql.ast.statement.SQLSelectQueryBlock;
+import com.alibaba.druid.sql.dialect.oracle.ast.OracleSQLObject;
 import com.alibaba.druid.sql.dialect.oracle.ast.clause.ModelClause;
 import com.alibaba.druid.sql.dialect.oracle.visitor.OracleASTVisitor;
 import com.alibaba.druid.sql.visitor.SQLASTVisitor;
+import com.alibaba.druid.util.JdbcConstants;
 
-public class OracleSelectQueryBlock extends SQLSelectQueryBlock {
+public class OracleSelectQueryBlock extends SQLSelectQueryBlock implements OracleSQLObject {
 
-    private final List<SQLCommentHint>         hints = new ArrayList<SQLCommentHint>(1);
+    private ModelClause                modelClause;
+    private boolean                    skipLocked  = false;
 
-    private OracleSelectHierachicalQueryClause hierachicalQueryClause;
-    private ModelClause                        modelClause;
+    public OracleSelectQueryBlock clone() {
+        OracleSelectQueryBlock x = new OracleSelectQueryBlock();
+
+        super.cloneTo(x);
+
+        if (hints != null) {
+            for (SQLCommentHint hint : hints) {
+                SQLCommentHint hint1 = hint.clone();
+                hint1.setParent(x);
+                x.getHints().add(hint1);
+            }
+        }
+
+        if (modelClause != null) {
+            x.setModelClause(modelClause.clone());
+        }
+
+        if (forUpdateOf != null) {
+            for (SQLExpr item : forUpdateOf) {
+                SQLExpr item1 = item.clone();
+                item1.setParent(x);
+                forUpdateOf.add(item1);
+            }
+        }
+
+        x.skipLocked = skipLocked;
+
+        return x;
+    }
 
     public OracleSelectQueryBlock(){
-
+        dbType = JdbcConstants.ORACLE;
     }
 
     public ModelClause getModelClause() {
@@ -44,16 +80,12 @@ public class OracleSelectQueryBlock extends SQLSelectQueryBlock {
         this.modelClause = modelClause;
     }
 
-    public OracleSelectHierachicalQueryClause getHierachicalQueryClause() {
-        return this.hierachicalQueryClause;
+    public boolean isSkipLocked() {
+        return skipLocked;
     }
 
-    public void setHierachicalQueryClause(OracleSelectHierachicalQueryClause hierachicalQueryClause) {
-        this.hierachicalQueryClause = hierachicalQueryClause;
-    }
-
-    public List<SQLCommentHint> getHints() {
-        return this.hints;
+    public void setSkipLocked(boolean skipLocked) {
+        this.skipLocked = skipLocked;
     }
 
     @Override
@@ -66,21 +98,47 @@ public class OracleSelectQueryBlock extends SQLSelectQueryBlock {
         super.accept0(visitor);
     }
 
-    protected void accept0(OracleASTVisitor visitor) {
+    public void accept0(OracleASTVisitor visitor) {
         if (visitor.visit(this)) {
             acceptChild(visitor, this.hints);
             acceptChild(visitor, this.selectList);
             acceptChild(visitor, this.into);
             acceptChild(visitor, this.from);
             acceptChild(visitor, this.where);
-            acceptChild(visitor, this.hierachicalQueryClause);
+            acceptChild(visitor, this.startWith);
+            acceptChild(visitor, this.connectBy);
             acceptChild(visitor, this.groupBy);
+            acceptChild(visitor, this.orderBy);
+            acceptChild(visitor, this.waitTime);
+            acceptChild(visitor, this.limit);
             acceptChild(visitor, this.modelClause);
+            acceptChild(visitor, this.forUpdateOf);
         }
         visitor.endVisit(this);
     }
     
     public String toString() {
         return SQLUtils.toOracleString(this);
+    }
+
+    public void limit(int rowCount, int offset) {
+        if (offset <= 0) {
+            SQLExpr rowCountExpr = new SQLIntegerExpr(rowCount);
+            SQLExpr newCondition = SQLUtils.buildCondition(SQLBinaryOperator.BooleanAnd, rowCountExpr, false,
+                    where);
+            setWhere(newCondition);
+        } else {
+            throw new UnsupportedOperationException("not support offset");
+        }
+    }
+
+    public void setFrom(String tableName) {
+        SQLExprTableSource from;
+        if (tableName == null || tableName.length() == 0) {
+            from = null;
+        } else {
+            from = new OracleSelectTableReference(new SQLIdentifierExpr(tableName));
+        }
+        this.setFrom(from);
     }
 }

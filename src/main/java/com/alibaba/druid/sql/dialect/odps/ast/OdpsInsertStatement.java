@@ -1,5 +1,5 @@
 /*
- * Copyright 1999-2011 Alibaba Group Holding Ltd.
+ * Copyright 1999-2018 Alibaba Group Holding Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,33 +18,40 @@ package com.alibaba.druid.sql.dialect.odps.ast;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.alibaba.druid.sql.ast.SQLStatement;
 import com.alibaba.druid.sql.ast.SQLStatementImpl;
-import com.alibaba.druid.sql.ast.statement.SQLSubqueryTableSource;
+import com.alibaba.druid.sql.ast.statement.SQLTableSource;
+import com.alibaba.druid.sql.dialect.hive.ast.HiveInsert;
 import com.alibaba.druid.sql.dialect.odps.visitor.OdpsASTVisitor;
 import com.alibaba.druid.sql.visitor.SQLASTVisitor;
 import com.alibaba.druid.util.JdbcConstants;
 
-public class OdpsInsertStatement extends SQLStatementImpl implements SQLStatement {
+public class OdpsInsertStatement extends SQLStatementImpl {
 
-    private SQLSubqueryTableSource from;
+    private SQLTableSource from;
 
-    private List<OdpsInsert>       items = new ArrayList<OdpsInsert>();
+    private List<HiveInsert>       items = new ArrayList<HiveInsert>();
     
     public OdpsInsertStatement() {
         super (JdbcConstants.ODPS);
     }
 
-    public void setFrom(SQLSubqueryTableSource from) {
+    public void setFrom(SQLTableSource from) {
         this.from = from;
     }
 
-    public SQLSubqueryTableSource getFrom() {
+    public SQLTableSource getFrom() {
         return from;
     }
 
-    public List<OdpsInsert> getItems() {
+    public List<HiveInsert> getItems() {
         return items;
+    }
+    
+    public void addItem(HiveInsert item) {
+        if (item != null) {
+            item.setParent(this);
+        }
+        this.items.add(item);
     }
 
     @Override

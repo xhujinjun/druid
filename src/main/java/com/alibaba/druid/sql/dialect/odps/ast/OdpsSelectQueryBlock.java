@@ -1,5 +1,5 @@
 /*
- * Copyright 1999-2011 Alibaba Group Holding Ltd.
+ * Copyright 1999-2018 Alibaba Group Holding Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,20 +15,30 @@
  */
 package com.alibaba.druid.sql.dialect.odps.ast;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import com.alibaba.druid.sql.SQLUtils;
 import com.alibaba.druid.sql.ast.SQLExpr;
+import com.alibaba.druid.sql.ast.SQLHint;
+import com.alibaba.druid.sql.ast.SQLLimit;
 import com.alibaba.druid.sql.ast.SQLOrderBy;
+import com.alibaba.druid.sql.ast.expr.SQLIntegerExpr;
+import com.alibaba.druid.sql.ast.statement.SQLSelectOrderByItem;
 import com.alibaba.druid.sql.ast.statement.SQLSelectQueryBlock;
 import com.alibaba.druid.sql.dialect.odps.visitor.OdpsASTVisitor;
 import com.alibaba.druid.sql.visitor.SQLASTVisitor;
+import com.alibaba.druid.util.JdbcConstants;
 
 public class OdpsSelectQueryBlock extends SQLSelectQueryBlock {
 
     private SQLOrderBy orderBy;
 
-    private SQLExpr    limit;
-
     public OdpsSelectQueryBlock(){
+        dbType = JdbcConstants.ODPS;
 
+        distributeBy = new ArrayList<SQLExpr>();
+        sortBy = new ArrayList<SQLSelectOrderByItem>(2);
     }
 
     public SQLOrderBy getOrderBy() {
@@ -37,17 +47,6 @@ public class OdpsSelectQueryBlock extends SQLSelectQueryBlock {
 
     public void setOrderBy(SQLOrderBy orderBy) {
         this.orderBy = orderBy;
-    }
-
-    public SQLExpr getLimit() {
-        return limit;
-    }
-
-    public void setLimit(SQLExpr limit) {
-        if (limit != null) {
-            limit.setParent(this);
-        }
-        this.limit = limit;
     }
 
     @Override
@@ -60,9 +59,10 @@ public class OdpsSelectQueryBlock extends SQLSelectQueryBlock {
 
     @Override
     public boolean equals(Object obj) {
-        if (this == obj) return true;
-        if (obj == null) return false;
-        if (getClass() != obj.getClass()) return false;
+        if (!super.equals(obj)) {
+            return false;
+        }
+
         OdpsSelectQueryBlock other = (OdpsSelectQueryBlock) obj;
         if (limit == null) {
             if (other.limit != null) return false;
@@ -82,11 +82,14 @@ public class OdpsSelectQueryBlock extends SQLSelectQueryBlock {
 
     public void accept0(OdpsASTVisitor visitor) {
         if (visitor.visit(this)) {
+            acceptChild(visitor, this.hints);
             acceptChild(visitor, this.selectList);
             acceptChild(visitor, this.from);
             acceptChild(visitor, this.where);
             acceptChild(visitor, this.groupBy);
             acceptChild(visitor, this.orderBy);
+            acceptChild(visitor, this.distributeBy);
+            acceptChild(visitor, this.sortBy);
             acceptChild(visitor, this.limit);
             acceptChild(visitor, this.into);
         }
@@ -94,4 +97,15 @@ public class OdpsSelectQueryBlock extends SQLSelectQueryBlock {
         visitor.endVisit(this);
     }
 
+    public String toString() {
+        return SQLUtils.toOdpsString(this);
+    }
+
+    public void limit(int rowCount, int offset) {
+        if (offset > 0) {
+            throw new UnsupportedOperationException("not support offset");
+        }
+
+        setLimit(new SQLLimit(new SQLIntegerExpr(rowCount)));
+    }
 }
