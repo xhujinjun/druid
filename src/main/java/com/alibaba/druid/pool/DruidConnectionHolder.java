@@ -41,52 +41,58 @@ import com.alibaba.druid.util.Utils;
  * @author wenshao [szujobs@hotmail.com]
  */
 public final class DruidConnectionHolder {
-    private final static Log                      LOG                      = LogFactory.getLog(DruidConnectionHolder.class);
-    public static boolean                         holdabilityUnsupported   = false;
+    private final static Log LOG = LogFactory.getLog(DruidConnectionHolder.class);
+    public static boolean holdabilityUnsupported = false;
 
-    protected final DruidAbstractDataSource       dataSource;
-    protected final long                          connectionId;
-    protected final Connection                    conn;
+    protected final DruidAbstractDataSource dataSource;
+    protected final long connectionId;
+    protected final Connection conn;
     protected final List<ConnectionEventListener> connectionEventListeners = new CopyOnWriteArrayList<ConnectionEventListener>();
-    protected final List<StatementEventListener>  statementEventListeners  = new CopyOnWriteArrayList<StatementEventListener>();
-    protected final long                          connectTimeMillis;
-    protected volatile long                       lastActiveTimeMillis;
-    protected volatile long                       lastValidTimeMillis;
-    protected long                                useCount                 = 0;
-    private long                                  keepAliveCheckCount      = 0;
-    private long                                  lastNotEmptyWaitNanos;
-    private final long                            createNanoSpan;
-    protected PreparedStatementPool               statementPool;
-    protected final List<Statement>               statementTrace           = new ArrayList<Statement>(2);
-    protected final boolean                       defaultReadOnly;
-    protected final int                           defaultHoldability;
-    protected final int                           defaultTransactionIsolation;
-    protected final boolean                       defaultAutoCommit;
-    protected boolean                             underlyingReadOnly;
-    protected int                                 underlyingHoldability;
-    protected int                                 underlyingTransactionIsolation;
-    protected boolean                             underlyingAutoCommit;
-    protected boolean                             discard                  = false;
-    protected final Map<String, Object>           variables;
-    protected final Map<String, Object>           globleVariables;
+    protected final List<StatementEventListener> statementEventListeners = new CopyOnWriteArrayList<StatementEventListener>();
+    /**
+     * 创建连接的时间
+     */
+    protected final long connectTimeMillis;
+    /**
+     * 连接的最后活跃(Active)时间
+     */
+    protected volatile long lastActiveTimeMillis;
+    protected volatile long lastValidTimeMillis;
+    protected long useCount = 0;
+    private long keepAliveCheckCount = 0;
+    private long lastNotEmptyWaitNanos;
+    private final long createNanoSpan;
+    protected PreparedStatementPool statementPool;
+    protected final List<Statement> statementTrace = new ArrayList<Statement>(2);
+    protected final boolean defaultReadOnly;
+    protected final int defaultHoldability;
+    protected final int defaultTransactionIsolation;
+    protected final boolean defaultAutoCommit;
+    protected boolean underlyingReadOnly;
+    protected int underlyingHoldability;
+    protected int underlyingTransactionIsolation;
+    protected boolean underlyingAutoCommit;
+    protected boolean discard = false;
+    protected final Map<String, Object> variables;
+    protected final Map<String, Object> globleVariables;
 
     public DruidConnectionHolder(DruidAbstractDataSource dataSource, PhysicalConnectionInfo pyConnectInfo)
-                                                                                                          throws SQLException{
+            throws SQLException {
         this(dataSource,
-            pyConnectInfo.getPhysicalConnection(),
-            pyConnectInfo.getConnectNanoSpan(),
-            pyConnectInfo.getVairiables(),
-            pyConnectInfo.getGlobalVairiables());
+                pyConnectInfo.getPhysicalConnection(),
+                pyConnectInfo.getConnectNanoSpan(),
+                pyConnectInfo.getVairiables(),
+                pyConnectInfo.getGlobalVairiables());
     }
 
     public DruidConnectionHolder(DruidAbstractDataSource dataSource, Connection conn, long connectNanoSpan)
-                                                                                                           throws SQLException{
+            throws SQLException {
         this(dataSource, conn, connectNanoSpan, null, null);
     }
 
     public DruidConnectionHolder(DruidAbstractDataSource dataSource, Connection conn, long connectNanoSpan,
                                  Map<String, Object> variables, Map<String, Object> globleVariables)
-                                                                                                    throws SQLException{
+            throws SQLException {
         this.dataSource = dataSource;
         this.conn = conn;
         this.createNanoSpan = connectNanoSpan;
@@ -107,9 +113,9 @@ public final class DruidConnectionHolder {
         {
             boolean initUnderlyHoldability = !holdabilityUnsupported;
             if (JdbcConstants.SYBASE.equals(dataSource.dbType) //
-                || JdbcConstants.DB2.equals(dataSource.dbType) //
-                || JdbcConstants.HIVE.equals(dataSource.dbType) //
-                || JdbcConstants.ODPS.equals(dataSource.dbType) //
+                    || JdbcConstants.DB2.equals(dataSource.dbType) //
+                    || JdbcConstants.HIVE.equals(dataSource.dbType) //
+                    || JdbcConstants.ODPS.equals(dataSource.dbType) //
             ) {
                 initUnderlyHoldability = false;
             }

@@ -229,6 +229,7 @@ public class DruidPooledConnection extends PoolableWrapper implements javax.sql.
         return disable;
     }
 
+    //主要流程：关闭连接
     @Override
     public void close() throws SQLException {
         if (this.disable) {
